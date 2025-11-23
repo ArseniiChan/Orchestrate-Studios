@@ -1,0 +1,93 @@
+{
+  "workflow": {
+    "id": "marketing-campaign-generation",
+    "name": "Marketing Campaign Generation Workflow",
+    "version": "1.0.0",
+    "description": "Transform video content into comprehensive marketing campaigns",
+    "trigger": {
+      "type": "api",
+      "endpoint": "/api/orchestrate/trigger",
+      "method": "POST"
+    },
+    "inputs": {
+      "transcript": {
+        "type": "string",
+        "required": true,
+        "source": "video_upload|manual_input"
+      },
+      "metadata": {
+        "type": "object",
+        "required": false
+      }
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "Analyze Content Strategy",
+        "agent": "strategy-intelligence",
+        "action": "analyze_transcript",
+        "input": {
+          "transcript": "${inputs.transcript}"
+        },
+        "output": "strategy",
+        "on_error": "retry",
+        "timeout": 30
+      },
+      {
+        "step": 2,
+        "name": "Optimize for Platforms",
+        "agent": "platform-optimization",
+        "action": "create_platform_content",
+        "input": {
+          "strategy": "${steps[0].output}"
+        },
+        "output": "platform_content",
+        "on_error": "use_fallback",
+        "timeout": 30
+      },
+      {
+        "step": 3,
+        "name": "Generate Production Tasks",
+        "agent": "production-tasks",
+        "action": "create_task_list",
+        "input": {
+          "platform_content": "${steps[1].output}"
+        },
+        "output": "production_tasks",
+        "parallel": false,
+        "on_error": "continue",
+        "timeout": 30
+      },
+      {
+        "step": 4,
+        "name": "Predict Performance",
+        "agent": "analytics-prediction",
+        "action": "analyze_campaign",
+        "input": {
+          "strategy": "${steps[0].output}",
+          "platform_content": "${steps[1].output}",
+          "production_tasks": "${steps[2].output}"
+        },
+        "output": "analytics",
+        "required": false,
+        "on_error": "skip",
+        "timeout": 30
+      }
+    ],
+    "outputs": {
+      "campaign": {
+        "strategy": "${steps[0].output}",
+        "platform_content": "${steps[1].output}",
+        "production_tasks": "${steps[2].output}",
+        "analytics": "${steps[3].output}"
+      }
+    },
+    "metrics": {
+      "target_duration": 180,
+      "success_criteria": {
+        "completion_rate": 95,
+        "error_rate": 5
+      }
+    }
+  }
+}

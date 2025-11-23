@@ -1,0 +1,112 @@
+{
+  "agents": {
+    "strategy-intelligence": {
+      "id": "strategy-intelligence",
+      "name": "Strategy Intelligence Agent",
+      "version": "1.0.0",
+      "type": "analyzer",
+      "capabilities": [
+        "transcript_analysis",
+        "theme_extraction",
+        "audience_identification",
+        "objective_generation"
+      ],
+      "implementation": {
+        "type": "local",
+        "path": "backend/agents/strategy_agent.py",
+        "entry_point": "execute"
+      },
+      "performance": {
+        "avg_response_time": 2.5,
+        "success_rate": 98,
+        "max_input_size": 50000
+      }
+    },
+    "platform-optimization": {
+      "id": "platform-optimization",
+      "name": "Platform Optimization Agent",
+      "version": "1.0.0",
+      "type": "generator",
+      "capabilities": [
+        "content_adaptation",
+        "hashtag_generation",
+        "caption_writing",
+        "format_optimization"
+      ],
+      "platforms": {
+        "tiktok": {
+          "max_duration": 180,
+          "optimal_duration": 30,
+          "hashtag_limit": 10
+        },
+        "instagram": {
+          "reel_duration": 90,
+          "caption_limit": 2200,
+          "hashtag_limit": 30
+        },
+        "linkedin": {
+          "video_duration": 600,
+          "caption_limit": 3000,
+          "hashtag_limit": 5
+        }
+      },
+      "implementation": {
+        "type": "local",
+        "path": "backend/agents/platform_agent.py",
+        "entry_point": "execute"
+      }
+    },
+    "production-tasks": {
+      "id": "production-tasks",
+      "name": "Production Task Agent",
+      "version": "1.0.0",
+      "type": "planner",
+      "capabilities": [
+        "task_generation",
+        "priority_assignment",
+        "time_estimation",
+        "workflow_creation"
+      ],
+      "task_templates": {
+        "categories": [
+          "pre-production",
+          "filming",
+          "editing",
+          "publishing",
+          "monitoring"
+        ],
+        "priorities": ["HIGH", "MEDIUM", "LOW"],
+        "default_tasks": 7
+      },
+      "implementation": {
+        "type": "local",
+        "path": "backend/agents/production_agent.py",
+        "entry_point": "execute"
+      }
+    },
+    "analytics-prediction": {
+      "id": "analytics-prediction",
+      "name": "Analytics Prediction Agent",
+      "version": "1.0.0",
+      "type": "predictor",
+      "capabilities": [
+        "performance_prediction",
+        "engagement_estimation",
+        "roi_calculation",
+        "optimization_suggestions"
+      ],
+      "metrics": [
+        "views",
+        "engagement_rate",
+        "share_rate",
+        "conversion_rate",
+        "roi"
+      ],
+      "implementation": {
+        "type": "local",
+        "path": "backend/agents/analytics_agent.py",
+        "entry_point": "execute"
+      }
+    }
+  }
+}

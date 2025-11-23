@@ -1,0 +1,102 @@
+{
+  "skills": [
+    {
+      "id": "video-transcription",
+      "name": "Video Transcription",
+      "description": "Extract text from video using IBM Watson Speech-to-Text",
+      "category": "media-processing",
+      "provider": "watson-stt",
+      "configuration": {
+        "model": "en-US_BroadbandModel",
+        "smart_formatting": true,
+        "timestamps": false,
+        "profanity_filter": false,
+        "max_duration": 3600
+      },
+      "input": {
+        "type": "video",
+        "formats": ["mp4", "mov", "webm", "avi"],
+        "max_size": "2GB"
+      },
+      "output": {
+        "type": "text",
+        "format": "plain_text"
+      }
+    },
+    {
+      "id": "strategy-generation",
+      "name": "Strategy Generation",
+      "description": "Generate marketing strategy from content analysis",
+      "category": "content-analysis",
+      "provider": "custom-agent",
+      "configuration": {
+        "agent_id": "strategy-intelligence",
+        "model": "rule-based",
+        "fallback": "pattern-matching"
+      },
+      "input": {
+        "type": "text",
+        "min_length": 10,
+        "max_length": 50000
+      },
+      "output": {
+        "type": "structured",
+        "schema": {
+          "key_themes": "array",
+          "target_audience": "string",
+          "campaign_objectives": "array",
+          "value_proposition": "string"
+        }
+      }
+    },
+    {
+      "id": "content-optimization",
+      "name": "Platform Content Optimization",
+      "description": "Optimize content for social media platforms",
+      "category": "content-creation",
+      "provider": "custom-agent",
+      "configuration": {
+        "agent_id": "platform-optimization",
+        "platforms": ["tiktok", "instagram", "linkedin"],
+        "optimization_level": "high"
+      },
+      "input": {
+        "type": "structured",
+        "required": ["strategy"]
+      },
+      "output": {
+        "type": "structured",
+        "schema": {
+          "tiktok": "object",
+          "instagram": "object",
+          "linkedin": "object"
+        }
+      }
+    },
+    {
+      "id": "task-generation",
+      "name": "Production Task Generation",
+      "description": "Create actionable production tasks",
+      "category": "project-management",
+      "provider": "custom-agent",
+      "configuration": {
+        "agent_id": "production-tasks",
+        "task_categories": ["pre-production", "production", "post-production", "distribution"],
+        "priority_levels": ["HIGH", "MEDIUM", "LOW"]
+      },
+      "input": {
+        "type": "structured",
+        "required": ["platform_content"]
+      },
+      "output": {
+        "type": "array",
+        "items": {
+          "id": "string",
+          "title": "string",
+          "priority": "string",
+          "estimated_hours": "number"
+        }
+      }
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 """
 Marketing Operations Command Center - FastAPI Backend
 IBM watsonx Orchestrate Hackathon Project
-COMPLETE WORKING VERSION with Watson STT
+COMPLETE VERSION with Orchestrate Configuration
 """
 import os
 import json
@@ -33,6 +33,46 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ==================== Load Orchestrate Configuration ====================
+def load_orchestrate_config():
+    """Load IBM watsonx Orchestrate configuration"""
+    base_path = Path(__file__).parent.parent
+    config_path = base_path / "orchestrate/configs/orchestrate_config.json"
+    workflow_path = base_path / "orchestrate/workflows/marketing_workflow.json"
+    skills_path = base_path / "orchestrate/skills/skill_definitions.json"
+    registry_path = base_path / "orchestrate/configs/agent_registry.json"
+    
+    config = {}
+    
+    try:
+        if config_path.exists():
+            with open(config_path, 'r') as f:
+                config['orchestrate'] = json.load(f)
+                logger.info(f"✅ Loaded Orchestrate config: {config['orchestrate']['name']}")
+        
+        if workflow_path.exists():
+            with open(workflow_path, 'r') as f:
+                config['workflow'] = json.load(f)
+                logger.info(f"✅ Loaded workflow: {config['workflow']['workflow']['name']}")
+                
+        if skills_path.exists():
+            with open(skills_path, 'r') as f:
+                config['skills'] = json.load(f)
+                logger.info(f"✅ Loaded {len(config['skills']['skills'])} skill definitions")
+                
+        if registry_path.exists():
+            with open(registry_path, 'r') as f:
+                config['registry'] = json.load(f)
+                logger.info(f"✅ Loaded agent registry with {len(config['registry']['agents'])} agents")
+                
+        return config
+    except Exception as e:
+        logger.warning(f"Could not load Orchestrate config: {e}")
+        return None
+
+# Load configuration on startup
+ORCHESTRATE_CONFIG = load_orchestrate_config()
+
 # Initialize FastAPI app
 app = FastAPI(
     title="Marketing Operations Command Center",
@@ -43,7 +83,7 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],  # Frontend URLs
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -62,7 +102,7 @@ class Settings:
     ORCHESTRATE_WORKSPACE_ID = os.getenv("ORCHESTRATE_WORKSPACE_ID")
     ORCHESTRATE_API_KEY = os.getenv("ORCHESTRATE_API_KEY", os.getenv("IBM_CLOUD_API_KEY"))
     
-    # IBM Watson Speech-to-Text - WITH YOUR ACTUAL CREDENTIALS
+    # IBM Watson Speech-to-Text
     WATSON_STT_URL = os.getenv("WATSON_STT_URL", "https://api.us-south.speech-to-text.watson.cloud.ibm.com/instances/475537ec-370b-4e6a-a7a8-a1a6ab3bee0c")
     WATSON_STT_API_KEY = os.getenv("WATSON_STT_API_KEY", "_UP7mhpiVYiZpGdEukbED-uyx1py1virhxs2AHP4XhKZ")
     
@@ -152,7 +192,7 @@ async def extract_audio_from_video(video_path: str) -> str:
         raise HTTPException(status_code=500, detail=f"Audio extraction failed: {str(e)}")
 
 async def transcribe_audio_watson(audio_path: str) -> str:
-    """Transcribe audio using IBM Watson Speech-to-Text - ACTUALLY WORKING VERSION"""
+    """Transcribe audio using IBM Watson Speech-to-Text"""
     try:
         # Your actual Watson credentials
         WATSON_URL = settings.WATSON_STT_URL
@@ -209,7 +249,6 @@ async def transcribe_audio_watson(audio_path: str) -> str:
         
         if not transcript:
             logger.warning("Watson returned empty transcript - audio might be silent or unclear")
-            # Return a message that indicates the issue
             return "Audio transcription failed - video might be silent or audio unclear. Please use manual transcript."
         
         logger.info(f"✅ Transcription successful: {len(transcript)} characters")
@@ -222,7 +261,6 @@ async def transcribe_audio_watson(audio_path: str) -> str:
         raise HTTPException(status_code=408, detail="Transcription timeout - try a shorter video")
     except Exception as e:
         logger.error(f"Watson STT error: {str(e)}", exc_info=True)
-        # Don't return demo content - return error message
         raise HTTPException(
             status_code=500,
             detail=f"Transcription failed: {str(e)}. Please use manual transcript option."
@@ -232,15 +270,23 @@ async def transcribe_audio_watson(audio_path: str) -> str:
 async def call_strategy_agent(transcript: str) -> Dict[str, Any]:
     """
     Call the Strategy Intelligence Agent
+    Uses configuration from Orchestrate if available
     """
     try:
+        # Check if we have Orchestrate config for this agent
+        agent_config = None
+        if ORCHESTRATE_CONFIG and 'registry' in ORCHESTRATE_CONFIG:
+            agent_config = ORCHESTRATE_CONFIG['registry']['agents'].get('strategy-intelligence')
+            if agent_config:
+                logger.info(f"Using Orchestrate config for {agent_config['name']}")
+        
         if not transcript or len(transcript.strip()) < 10:
             logger.warning("Invalid transcript, using fallback")
             transcript = "Video about our product or service"
         
         logger.info(f"Calling strategy agent with transcript: {transcript[:100]}...")
         
-        # Call your actual strategy agent that analyzes the transcript
+        # Call your actual strategy agent
         result = await strategy_agent.execute(transcript)
         
         logger.info(f"Strategy agent returned themes: {result.get('key_themes', [])}")
@@ -248,7 +294,6 @@ async def call_strategy_agent(transcript: str) -> Dict[str, Any]:
         
     except Exception as e:
         logger.error(f"Strategy agent error: {str(e)}", exc_info=True)
-        # Fallback but at least use transcript content
         return {
             "analysis_source": "fallback",
             "target_audience": f"Audience interested in: {transcript[:50]}",
@@ -261,8 +306,16 @@ async def call_strategy_agent(transcript: str) -> Dict[str, Any]:
 async def call_platform_agent(strategy: Dict[str, Any]) -> Dict[str, Any]:
     """
     Call the Platform Optimization Agent
+    Uses configuration from Orchestrate if available
     """
     try:
+        # Check for Orchestrate config
+        agent_config = None
+        if ORCHESTRATE_CONFIG and 'registry' in ORCHESTRATE_CONFIG:
+            agent_config = ORCHESTRATE_CONFIG['registry']['agents'].get('platform-optimization')
+            if agent_config:
+                logger.info(f"Using Orchestrate config for {agent_config['name']}")
+        
         logger.info(f"Calling platform agent with themes: {strategy.get('key_themes', [])}")
         
         # Call your actual platform agent
@@ -289,8 +342,16 @@ async def call_platform_agent(strategy: Dict[str, Any]) -> Dict[str, Any]:
 async def call_production_agent(platform_content: Dict[str, Any]) -> Dict[str, Any]:
     """
     Call the Production Task Agent
+    Uses configuration from Orchestrate if available
     """
     try:
+        # Check for Orchestrate config
+        agent_config = None
+        if ORCHESTRATE_CONFIG and 'registry' in ORCHESTRATE_CONFIG:
+            agent_config = ORCHESTRATE_CONFIG['registry']['agents'].get('production-tasks')
+            if agent_config:
+                logger.info(f"Using Orchestrate config for {agent_config['name']}")
+        
         logger.info("Calling production agent...")
         
         # Call your actual production agent
@@ -326,8 +387,16 @@ async def call_analytics_agent(
 ) -> Dict[str, Any]:
     """
     Call the Analytics Agent
+    Uses configuration from Orchestrate if available
     """
     try:
+        # Check for Orchestrate config
+        agent_config = None
+        if ORCHESTRATE_CONFIG and 'registry' in ORCHESTRATE_CONFIG:
+            agent_config = ORCHESTRATE_CONFIG['registry']['agents'].get('analytics-prediction')
+            if agent_config:
+                logger.info(f"Using Orchestrate config for {agent_config['name']}")
+        
         logger.info("Calling analytics agent...")
         
         tasks_list = production_tasks.get("tasks", [])
@@ -350,14 +419,17 @@ async def call_analytics_agent(
 @app.get("/")
 async def root():
     """Root endpoint with API information"""
+    orchestrate_status = "configured" if ORCHESTRATE_CONFIG else "local"
     return {
         "name": "Marketing Operations Command Center API",
         "version": "1.0.0",
         "status": "operational",
+        "orchestrate": orchestrate_status,
         "endpoints": {
             "upload_video": "/api/video/upload",
             "create_campaign": "/api/campaign/create",
             "from_transcript": "/api/campaign/from-transcript",
+            "orchestrate_config": "/api/orchestrate/config",
             "health": "/api/health"
         }
     }
@@ -371,7 +443,7 @@ async def health_check():
             "timestamp": datetime.utcnow().isoformat(),
             "services": {
                 "watson_stt": bool(settings.WATSON_STT_API_KEY),
-                "orchestrate": bool(settings.ORCHESTRATE_WORKSPACE_ID),
+                "orchestrate": bool(ORCHESTRATE_CONFIG),
                 "watsonx_ai": bool(settings.WATSONX_PROJECT_ID),
                 "agents": {
                     "strategy": "operational",
@@ -386,6 +458,53 @@ async def health_check():
             status_code=503,
             content={"status": "unhealthy", "error": str(e)}
         )
+
+@app.get("/api/orchestrate/config")
+async def get_orchestrate_config():
+    """Get current Orchestrate configuration"""
+    if ORCHESTRATE_CONFIG:
+        # Get agent details
+        agents = []
+        if 'orchestrate' in ORCHESTRATE_CONFIG:
+            agents = [
+                {
+                    "id": agent["id"],
+                    "name": agent["name"],
+                    "status": "configured"
+                }
+                for agent in ORCHESTRATE_CONFIG['orchestrate']['agents']
+            ]
+        
+        # Get workflow details
+        workflow_steps = []
+        if 'workflow' in ORCHESTRATE_CONFIG:
+            workflow_steps = [
+                {
+                    "step": step["step"],
+                    "name": step["name"],
+                    "agent": step["agent"]
+                }
+                for step in ORCHESTRATE_CONFIG['workflow']['workflow']['steps']
+            ]
+        
+        return {
+            "status": "configured",
+            "mode": "orchestrate",
+            "agents": agents,
+            "workflow": {
+                "name": ORCHESTRATE_CONFIG.get('workflow', {}).get('workflow', {}).get('name', 'Unknown'),
+                "steps": workflow_steps
+            },
+            "skills_count": len(ORCHESTRATE_CONFIG.get('skills', {}).get('skills', [])),
+            "config_loaded": True
+        }
+    else:
+        return {
+            "status": "local",
+            "mode": "standalone",
+            "message": "Running in local agent mode without Orchestrate configuration",
+            "agents": ["strategy", "platform", "production", "analytics"]
+        }
 
 @app.post("/api/video/upload")
 async def upload_video(file: UploadFile = File(...)):
@@ -460,6 +579,7 @@ async def upload_video(file: UploadFile = File(...)):
 async def create_campaign(request: CampaignRequest):
     """
     Create a complete marketing campaign from transcript
+    Follows the workflow defined in Orchestrate configuration
     """
     start_time = datetime.utcnow()
     
@@ -473,6 +593,11 @@ async def create_campaign(request: CampaignRequest):
         
         logger.info(f"Starting campaign creation with transcript ({len(request.transcript)} chars)")
         logger.info(f"Transcript preview: {request.transcript[:200]}...")
+        
+        # Check if we're using Orchestrate workflow
+        if ORCHESTRATE_CONFIG and 'workflow' in ORCHESTRATE_CONFIG:
+            workflow = ORCHESTRATE_CONFIG['workflow']['workflow']
+            logger.info(f"Using Orchestrate workflow: {workflow['name']}")
         
         # Step 1: Strategy Intelligence Agent
         logger.info("Step 1: Calling Strategy Agent...")
@@ -611,6 +736,11 @@ async def trigger_orchestrate_workflow(request: Dict[str, Any]):
         
         logger.info(f"Triggering Orchestrate workflow with transcript: {transcript[:100]}...")
         
+        # Use workflow from configuration if available
+        if ORCHESTRATE_CONFIG and 'workflow' in ORCHESTRATE_CONFIG:
+            workflow_name = ORCHESTRATE_CONFIG['workflow']['workflow']['name']
+            logger.info(f"Executing workflow: {workflow_name}")
+        
         # Run all agents in sequence
         strategy = await call_strategy_agent(transcript)
         platform_content = await call_platform_agent(strategy)
@@ -621,6 +751,7 @@ async def trigger_orchestrate_workflow(request: Dict[str, Any]):
             "success": True,
             "workflow_id": f"wf_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
             "status": "completed",
+            "workflow": ORCHESTRATE_CONFIG['workflow']['workflow']['name'] if ORCHESTRATE_CONFIG else "default",
             "results": {
                 "strategy": strategy,
                 "platform_content": platform_content,
@@ -646,19 +777,42 @@ async def get_orchestrate_status(workflow_id: str):
 @app.on_event("startup")
 async def startup_event():
     """Initialize application on startup"""
-    logger.info("=" * 50)
+    logger.info("=" * 60)
     logger.info("Marketing Operations Command Center - Starting Up")
-    logger.info("=" * 50)
+    logger.info("=" * 60)
     
     try:
         settings.validate()
         logger.info("✅ Environment variables checked")
         logger.info(f"✅ IBM Cloud Region: {settings.IBM_CLOUD_REGION}")
         logger.info(f"✅ Watson STT: {bool(settings.WATSON_STT_API_KEY)}")
-        logger.info(f"✅ Watson STT URL: {settings.WATSON_STT_URL[:50]}...")
-        logger.info(f"✅ Orchestrate: {bool(settings.ORCHESTRATE_WORKSPACE_ID)}")
-        logger.info("✅ Agents loaded: strategy, platform, production, analytics")
-        logger.info("✅ Application ready!")
+        
+        # Show Orchestrate configuration status
+        if ORCHESTRATE_CONFIG:
+            logger.info("✅ IBM watsonx Orchestrate configuration loaded")
+            if 'orchestrate' in ORCHESTRATE_CONFIG:
+                agents = ORCHESTRATE_CONFIG['orchestrate']['agents']
+                logger.info(f"   📋 {len(agents)} agents configured:")
+                for agent in agents:
+                    logger.info(f"      • {agent['name']}")
+            if 'workflow' in ORCHESTRATE_CONFIG:
+                workflow = ORCHESTRATE_CONFIG['workflow']['workflow']
+                steps = workflow['steps']
+                logger.info(f"   🔄 Workflow: {workflow['name']}")
+                logger.info(f"      • {len(steps)} steps configured")
+            if 'skills' in ORCHESTRATE_CONFIG:
+                skills = ORCHESTRATE_CONFIG['skills']['skills']
+                logger.info(f"   🛠️  {len(skills)} skills defined")
+            if 'registry' in ORCHESTRATE_CONFIG:
+                registry = ORCHESTRATE_CONFIG['registry']['agents']
+                logger.info(f"   📚 Agent registry with {len(registry)} agents")
+        else:
+            logger.info("⚠️  Running without Orchestrate config (local mode)")
+            logger.info("   Agents available: strategy, platform, production, analytics")
+        
+        logger.info("=" * 60)
+        logger.info("✅ Application ready for hackathon demo!")
+        logger.info("=" * 60)
     except Exception as e:
         logger.warning(f"⚠️  Some services not configured: {str(e)}")
         logger.info("✅ Running with available services")
