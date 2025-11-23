@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useRef, useState } from "react"
 import { Upload, FileVideo, AlertCircle, CheckCircle2 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,13 +8,15 @@ import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { api } from '@/lib/api'
 
 interface VideoUploaderProps {
   onFileSelect: (file: File) => void
   onStatusChange: (status: "idle" | "uploading" | "orchestrating" | "completed" | "error") => void
+  onCampaignCreated?: (campaign: any) => void  // Add this prop to pass campaign data
 }
 
-export function VideoUploader({ onFileSelect, onStatusChange }: VideoUploaderProps) {
+export function VideoUploader({ onFileSelect, onStatusChange, onCampaignCreated }: VideoUploaderProps) {
   const [file, setFile] = useState<File | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
@@ -44,7 +45,7 @@ export function VideoUploader({ onFileSelect, onStatusChange }: VideoUploaderPro
     const selectedFile = e.target.files?.[0]
     if (selectedFile && validateFile(selectedFile)) {
       setFile(selectedFile)
-      simulateUpload()
+      // Don't auto-upload, wait for submit button
     }
   }
 
@@ -53,45 +54,88 @@ export function VideoUploader({ onFileSelect, onStatusChange }: VideoUploaderPro
     const droppedFile = e.dataTransfer.files?.[0]
     if (droppedFile && validateFile(droppedFile)) {
       setFile(droppedFile)
-      simulateUpload()
+      // Don't auto-upload, wait for submit button
     }
   }
 
-  const simulateUpload = async () => {
+  const processVideo = async () => {
+    if (!file && !manualTranscript) {
+      setError("Please upload a video or provide a transcript")
+      return
+    }
+
     setIsUploading(true)
+    setError(null)
     onStatusChange("uploading")
 
-    for (let i = 0; i <= 100; i += 10) {
-      setUploadProgress(i)
-      await new Promise((resolve) => setTimeout(resolve, 100))
-    }
-
-    setIsUploading(false)
-    onStatusChange("orchestrating")
-    triggerOrchestration()
-  }
-
-  const triggerOrchestration = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
-      console.log("[v0] Triggering orchestration with:", { file: file?.name, apiUrl })
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-    } catch (err) {
-      setError("Failed to start orchestration")
+      let campaignResult
+
+      if (file) {
+        // Upload video and get transcript
+        console.log("Uploading video:", file.name)
+        setUploadProgress(30)
+        const uploadResult = await api.uploadVideo(file)
+        console.log("Upload complete, transcript:", uploadResult.transcript)
+        
+        setUploadProgress(60)
+        onStatusChange("orchestrating")
+        
+        // Create campaign from video transcript
+        campaignResult = await api.createCampaign(
+          uploadResult.transcript,
+          { title: file.name }
+        )
+      } else if (manualTranscript) {
+        // Create campaign from manual transcript
+        console.log("Using manual transcript")
+        onStatusChange("orchestrating")
+        campaignResult = await api.createCampaignFromTranscript(
+          manualTranscript,
+          "Manual Transcript"
+        )
+      }
+
+      setUploadProgress(100)
+      
+      if (campaignResult) {
+        console.log("Campaign created successfully:", campaignResult)
+        
+        // Pass campaign data to parent component if handler provided
+        if (onCampaignCreated) {
+          onCampaignCreated(campaignResult)
+        }
+        
+        // Show success message
+        onStatusChange("completed")
+        
+        // You can also display the campaign data here
+        alert(`Campaign created! ID: ${campaignResult.id}`)
+      }
+      
+    } catch (error) {
+      console.error("Error processing:", error)
+      setError(error instanceof Error ? error.message : "Failed to process video")
       onStatusChange("error")
-      console.error("[v0] Orchestration error:", err)
+    } finally {
+      setIsUploading(false)
+      setUploadProgress(0)
     }
   }
 
   const handleSubmit = () => {
-    if (!file && !useManualTranscript) {
+    if (!file && !manualTranscript) {
       setError("Please upload a video or provide a transcript")
+      return
+    }
+    if (!file && useManualTranscript && !manualTranscript.trim()) {
+      setError("Please enter a transcript")
       return
     }
     if (file) {
       onFileSelect(file)
     }
-    simulateUpload()
+    processVideo()
   }
 
   return (
@@ -158,7 +202,9 @@ export function VideoUploader({ onFileSelect, onStatusChange }: VideoUploaderPro
             aria-valuemax={100}
           >
             <div className="flex justify-between text-sm">
-              <span className="text-foreground">Uploading...</span>
+              <span className="text-foreground">
+                {uploadProgress < 50 ? "Uploading..." : "Creating campaign..."}
+              </span>
               <span className="text-muted-foreground">{uploadProgress}%</span>
             </div>
             <div className="w-full bg-border rounded-full h-2 overflow-hidden">
@@ -195,7 +241,7 @@ export function VideoUploader({ onFileSelect, onStatusChange }: VideoUploaderPro
         {/* Submit Button */}
         <Button
           onClick={handleSubmit}
-          disabled={isUploading || (!file && !useManualTranscript)}
+          disabled={isUploading || (!file && !manualTranscript.trim())}
           className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
           size="lg"
         >
