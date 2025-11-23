@@ -1,0 +1,22 @@
+# IBM Technologies (CORE REQUIREMENTS)
+ibm-watson>=7.0.0
+ibm-cloud-sdk-core>=3.18.0
+ibm-watson-machine-learning>=1.0.327  # For watsonx.ai integration
+
+# Backend Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+python-dotenv==1.0.0
+pydantic==2.5.0
+
+# HTTP Client for Orchestrate API calls
+httpx==0.25.1
+aiofiles==23.2.1
+
+# Video Processing
+ffmpeg-python==0.2.0
+
+# Development/Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
