@@ -66,7 +66,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       </Button>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden w-full">{children}</div>
+      <div className="flex-1 flex flex-col overflow-y-auto w-full">{children}</div>
     </div>
   )
 }
