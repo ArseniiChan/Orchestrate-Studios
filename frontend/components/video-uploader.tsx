@@ -13,7 +13,7 @@ import { api } from '@/lib/api'
 interface VideoUploaderProps {
   onFileSelect: (file: File) => void
   onStatusChange: (status: "idle" | "uploading" | "orchestrating" | "completed" | "error") => void
-  onCampaignCreated?: (campaign: any) => void  // Add this prop to pass campaign data
+  onCampaignCreated?: (campaign: any) => void
 }
 
 export function VideoUploader({ onFileSelect, onStatusChange, onCampaignCreated }: VideoUploaderProps) {
@@ -26,7 +26,7 @@ export function VideoUploader({ onFileSelect, onStatusChange, onCampaignCreated 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const SUPPORTED_FORMATS = ["video/mp4", "video/quicktime", "video/webm"]
-  const MAX_FILE_SIZE = 500 * 1024 * 1024
+  const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024  // 2GB (FIXED!)
 
   const validateFile = (selectedFile: File): boolean => {
     if (!SUPPORTED_FORMATS.includes(selectedFile.type)) {
@@ -34,7 +34,7 @@ export function VideoUploader({ onFileSelect, onStatusChange, onCampaignCreated 
       return false
     }
     if (selectedFile.size > MAX_FILE_SIZE) {
-      setError("File size must be under 500MB")
+      setError("File size must be under 2GB")  // FIXED!
       return false
     }
     setError(null)
@@ -45,7 +45,6 @@ export function VideoUploader({ onFileSelect, onStatusChange, onCampaignCreated 
     const selectedFile = e.target.files?.[0]
     if (selectedFile && validateFile(selectedFile)) {
       setFile(selectedFile)
-      // Don't auto-upload, wait for submit button
     }
   }
 
@@ -54,7 +53,6 @@ export function VideoUploader({ onFileSelect, onStatusChange, onCampaignCreated 
     const droppedFile = e.dataTransfer.files?.[0]
     if (droppedFile && validateFile(droppedFile)) {
       setFile(droppedFile)
-      // Don't auto-upload, wait for submit button
     }
   }
 
@@ -73,7 +71,7 @@ export function VideoUploader({ onFileSelect, onStatusChange, onCampaignCreated 
 
       if (file) {
         // Upload video and get transcript
-        console.log("Uploading video:", file.name)
+        console.log("Uploading video:", file.name, "Size:", (file.size / (1024 * 1024)).toFixed(2), "MB")
         setUploadProgress(30)
         const uploadResult = await api.uploadVideo(file)
         console.log("Upload complete, transcript:", uploadResult.transcript)
@@ -101,7 +99,7 @@ export function VideoUploader({ onFileSelect, onStatusChange, onCampaignCreated 
       if (campaignResult) {
         console.log("Campaign created successfully:", campaignResult)
         
-        // Pass campaign data to parent component if handler provided
+        // Pass campaign data to parent component
         if (onCampaignCreated) {
           onCampaignCreated(campaignResult)
         }
@@ -109,8 +107,8 @@ export function VideoUploader({ onFileSelect, onStatusChange, onCampaignCreated 
         // Show success message
         onStatusChange("completed")
         
-        // You can also display the campaign data here
-        alert(`Campaign created! ID: ${campaignResult.id}`)
+        // Remove the alert - let the UI show the results
+        // alert(`Campaign created! ID: ${campaignResult.id}`)
       }
       
     } catch (error) {
@@ -146,7 +144,7 @@ export function VideoUploader({ onFileSelect, onStatusChange, onCampaignCreated 
           Upload Video Content
         </CardTitle>
         <CardDescription>
-          Drag and drop your video file (MP4, MOV, WebM up to 500MB) or provide a transcript manually
+          Drag and drop your video file (MP4, MOV, WebM up to 2GB) or provide a transcript manually
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -160,7 +158,9 @@ export function VideoUploader({ onFileSelect, onStatusChange, onCampaignCreated 
         {file && !isUploading && (
           <Alert className="border-green-500/50 bg-green-500/5">
             <CheckCircle2 className="h-4 w-4 text-green-600" />
-            <AlertDescription className="text-green-700 dark:text-green-400">File ready: {file.name}</AlertDescription>
+            <AlertDescription className="text-green-700 dark:text-green-400">
+              File ready: {file.name} ({(file.size / (1024 * 1024)).toFixed(2)} MB)
+            </AlertDescription>
           </Alert>
         )}
 
@@ -181,7 +181,7 @@ export function VideoUploader({ onFileSelect, onStatusChange, onCampaignCreated 
         >
           <Upload className="w-8 sm:w-10 h-8 sm:h-10 mx-auto mb-3 text-muted-foreground" />
           <h3 className="font-semibold text-foreground mb-1">Drop your video here</h3>
-          <p className="text-sm text-muted-foreground">or click to browse files</p>
+          <p className="text-sm text-muted-foreground">or click to browse files (up to 2GB)</p>
           <Input
             ref={fileInputRef}
             type="file"
